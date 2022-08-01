@@ -33,12 +33,28 @@ app.post('/', (req, res) => {
             console.log("Error", err);
         } else {
             console.log("Success", data);
+            if (data.Item) {
+                // Items exists.
+                if (data.Item.active_sessions.N == 3) {
+                    console.log('Max sessions reached')
+                } else {
+                    updateSession(data.Item)
+                }
+
+            } else {
+                // Item did not exist. i.e. no active sessions and must create
+                console.log("Didn't find that user. Will create now...")
+            }
         }
     });
     res.status(200).json({
         message: `Maybe a success? Check the logs!`
     });
 });
+
+function updateSession(item) {
+    console.log("Going to update here...")
+}
 
 
 
