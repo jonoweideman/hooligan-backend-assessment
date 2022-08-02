@@ -11,12 +11,8 @@ var ddb = new AWS.DynamoDB({ apiVersion: '2012-08-10' });
 
 app.use(express.json());
 
-app.post('/', (req, res) => {
-
-    console.log(`TableName: ${TABLE_NAME}`)
-
+app.post('/add-session', (req, res) => {
     const user_id = req.query.user_id
-
     var params = {
         TableName: TABLE_NAME,
         Key: {
@@ -26,12 +22,9 @@ app.post('/', (req, res) => {
         },
     };
 
-    console.log(`User ID: ${user_id}`)
-
     fetchSession(params)
         .then(item => {
-            console.log(item);
-            const active_sessions = parseInt(item.Item.active_sessions.N)
+            const active_sessions = item.Item ? parseInt(item.Item.active_sessions.N) : 0
             if (item.Item && active_sessions < 3) {
                 increaseSession(user_id, active_sessions).then(() => {
                     res.status(200).json({
@@ -47,8 +40,7 @@ app.post('/', (req, res) => {
                     message: "Max sessions of 3 reached."
                 }).send();
             } else {
-                //user does not exist
-                increaseSession(user_id, 0).then(() => {
+                increaseSession(user_id, active_sessions).then(() => {
                     res.status(200).json({
                         message: `Number of active session incremented to 1`
                     }).send();
@@ -60,25 +52,59 @@ app.post('/', (req, res) => {
             }
         })
         .catch(err => {
-            console.log(err);
-            // res.status(500).json({
-            //     message: err
-            // });
-        })
-        .finally(obj => {
+            res.status(500).json({
+                message: err
+            }).send();
         })
 });
 
-function updateSession(item) {
-    console.log("Going to update here...")
-}
+app.post('/remove-session', (req, res) => {
+    const user_id = req.query.user_id
+    var params = {
+        TableName: TABLE_NAME,
+        Key: {
+            'user_id': {
+                N: user_id
+            }
+        },
+    };
+
+    fetchSession(params)
+        .then(item => {
+            const active_sessions = item.Item ? parseInt(item.Item.active_sessions.N) : 0
+            if (item.Item && active_sessions > 0) {
+                decreaseSession(user_id, active_sessions).then(() => {
+                    res.status(200).json({
+                        message: `Number of active session decremented to ${active_sessions - 1}`
+                    }).send();
+                }).catch(err => {
+                    res.status(500).json({
+                        message: err
+                    }).send();
+                })
+            } else if (item.Item && active_sessions == 0) {
+                res.status(409).json({
+                    message: "Already 0 active sessions, so can't remove any!"
+                }).send();
+            } else {
+                res.status(200).json({
+                    message: `Cannot decrement number of sessions for user which never existed!`
+                }).send();
+            }
+        })
+        .catch(err => {
+            res.status(500).json({
+                message: err
+            }).send();
+        })
+});
+
 
 const fetchSession = async (params) => {
     return ddb.getItem(params).promise();
 }
 
 const increaseSession = async (user_id, active_sessions) => {
-    console.log(`active session: ${active_sessions}`)
     var params = {
         TableName: TABLE_NAME,
         Item: {
@@ -86,7 +112,17 @@ const increaseSession = async (user_id, active_sessions) => {
             'active_sessions': { N: (active_sessions + 1).toString() }
         }
     };
-    console.log(params)
+    return ddb.putItem(params).promise();
+}
+
+const decreaseSession = async (user_id, active_sessions) => {
+    var params = {
+        TableName: TABLE_NAME,
+        Item: {
+            'user_id': { N: user_id },
+            'active_sessions': { N: (active_sessions - 1).toString() }
+        }
+    };
     return ddb.putItem(params).promise();
 }
 
