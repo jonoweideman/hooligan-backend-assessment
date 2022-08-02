@@ -28,32 +28,41 @@ app.post('/', (req, res) => {
 
     console.log(`User ID: ${user_id}`)
 
-    ddb.getItem(params, function (err, data) {
-        if (err) {
-            console.log("Error", err);
-        } else {
-            console.log("Success", data);
-            if (data.Item) {
-                // Items exists.
-                if (data.Item.active_sessions.N == 3) {
-                    console.log('Max sessions reached')
-                } else {
-                    updateSession(data.Item)
-                }
-
+    fetchSession(params)
+        .then(item => {
+            console.log(item);
+            if (item.Item && item.Item.active_sessions.N < 3) {
+                res.status(200).json({
+                    message: "Found user and can increase session count."
+                });
+            } else if (item.Item && item.Item.active_sessions.N == 3) {
+                res.status(200).json({
+                    message: "Max sessions reached."
+                });
             } else {
-                // Item did not exist. i.e. no active sessions and must create
-                console.log("Didn't find that user. Will create now...")
+                //user does not exist
+                res.status(200).json({
+                    message: "User does not exist and must be created."
+                });
             }
-        }
-    });
-    res.status(200).json({
-        message: `Maybe a success? Check the logs!`
-    });
+        })
+        .catch(err => {
+            console.log(err);
+            res.status(500).json({
+                message: err
+            });
+        })
+        .finally(obj => {
+            res.send();
+        })
 });
 
 function updateSession(item) {
     console.log("Going to update here...")
+}
+
+const fetchSession = async (params) => {
+    return ddb.getItem(params).promise();
 }
 
 
