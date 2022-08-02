@@ -99,7 +99,6 @@ app.post('/remove-session', (req, res) => {
         })
 });
 
-
 const fetchSession = async (params) => {
     return ddb.getItem(params).promise();
 }
@@ -129,4 +128,3 @@ const decreaseSession = async (user_id, active_sessions) => {
 app.listen(PORT, () => {
     console.log(`Server running on PORT ${PORT}`);
 });
-
